@@ -1,8 +1,8 @@
 {
-  "comment": "REPLACE the placeholder key secrets with your real DeepSeek API keys before first boot. The proxy reads this file only to seed the key pool (fresh DB). `id` is a stable internal name; `label` is a human-readable tag shown in /admin/status (masked).",
+  "comment": "Production DeepSeek API keys - replace placeholders with your real keys. The proxy reads this file to seed the key pool on fresh DB start.",
   "keys": [
-    { "id": "key-alpha", "key": "sk-DEMO-PLACEHOLDER-REPLACE-ALPHA-0000", "label": "Alpha key (primary)" },
-    { "id": "key-beta",  "key": "sk-DEMO-PLACEHOLDER-REPLACE-BETA-0000",  "label": "Beta key (fallback)" },
-    { "id": "key-gamma", "key": "sk-DEMO-PLACEHOLDER-REPLACE-GAMMA-0000", "label": "Gamma key (spare)" }
+    { "id": "gold-primary", "key": "sk-DEMO-GOLD-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "label": "🐤 Gold Key (primary)" },
+    { "id": "acc2-fallback", "key": "sk-DEMO-ACC2-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", "label": "Account 2 (fallback)" },
+    { "id": "acc3-spare", "key": "sk-DEMO-ACC3-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "label": "Account 3 (spare)" }
   ]
 }
