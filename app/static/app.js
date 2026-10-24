@@ -4,23 +4,50 @@ const BASE = window.location.origin;
 let adminToken = localStorage.getItem('adminToken') || '';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────
-const loginScreen  = document.getElementById('login-screen');
+const loginScreen   = document.getElementById('login-screen');
 const dashboardScreen = document.getElementById('dashboard-screen');
-const tokenInput   = document.getElementById('admin-token');
-const loginForm    = document.getElementById('login-form');
-const loginError   = document.getElementById('login-error');
-const logoutBtn    = document.getElementById('logout-btn');
+const tokenInput    = document.getElementById('admin-token');
+const loginForm     = document.getElementById('login-form');
+const loginError    = document.getElementById('login-error');
+const logoutBtn     = document.getElementById('logout-btn');
 const healthBadge  = document.getElementById('health-badge');
 const serviceUrl   = document.getElementById('service-url');
 const statStatus   = document.getElementById('stat-status');
 const statVersion  = document.getElementById('stat-version');
 const statTime     = document.getElementById('stat-time');
+const statAvailable = document.getElementById('stat-available');
+const statBound     = document.getElementById('stat-bound');
+const statTotal     = document.getElementById('stat-total');
 const refreshAll   = document.getElementById('refresh-all');
 const testProxy    = document.getElementById('test-proxy');
 const keysList     = document.getElementById('keys-list');
 const sessionsList = document.getElementById('sessions-list');
 const reloadKeys   = document.getElementById('reload-keys');
 const actionResult = document.getElementById('action-result');
+
+// Add key
+const btnAddKey    = document.getElementById('btn-add-key');
+const addResult    = document.getElementById('add-result');
+const newKeyId     = document.getElementById('new-key-id');
+const newKeyLabel  = document.getElementById('new-key-label');
+const newKeySecret = document.getElementById('new-key-secret');
+
+// Bot connection
+const botBase      = document.getElementById('bot-base');
+const botToken     = document.getElementById('bot-token');
+const btnToggle    = document.getElementById('btn-toggle-token');
+const btnCopy      = document.getElementById('btn-copy-token');
+const curlExample  = document.getElementById('curl-example');
+
+// Modal
+const editModal    = document.getElementById('edit-modal');
+const editKeyTitle = document.getElementById('edit-key-title');
+const editKeyId    = document.getElementById('edit-key-id');
+const editKeyLabel = document.getElementById('edit-key-label');
+const editKeySecret = document.getElementById('edit-key-secret');
+const btnEditSave  = document.getElementById('btn-edit-save');
+const btnEditCancel= document.getElementById('btn-edit-cancel');
+const editResult   = document.getElementById('edit-result');
 
 // API Tester
 const apiMethod    = document.getElementById('api-method');
@@ -31,8 +58,9 @@ const apiResult    = document.getElementById('api-result');
 
 // Quick actions
 const btnResetKey  = document.getElementById('btn-reset-key');
-const btnReassign  = document.getElementById('btn-reassign');
+const btnUnbind    = document.getElementById('btn-unbind');
 const btnSetState  = document.getElementById('btn-set-state');
+const btnSyncKeys  = document.getElementById('btn-sync-keys-json');
 
 // ── Init ──────────────────────────────────────────────────────────────────
 if (adminToken) {
@@ -87,6 +115,10 @@ function showDashboard() {
     loginScreen.classList.add('hidden');
     dashboardScreen.classList.remove('hidden');
     serviceUrl.textContent = BASE;
+    botBase.textContent = BASE;
+    botToken.textContent = adminToken;
+    curlExample.textContent =
+        `# اطلب حالة الخدمة\ncurl -sS ${BASE}/admin/status \\\n  -H "X-Admin-Token: $ADMIN_TOKEN"`;
     refreshAllData();
 }
 
@@ -115,6 +147,8 @@ refreshAll.addEventListener('click', refreshAllData);
 testProxy.addEventListener('click', testProxyEndpoint);
 reloadKeys.addEventListener('click', loadStatus);
 
+let tokenHidden = true;
+
 async function refreshAllData() {
     healthBadge.textContent = 'جاري التحميل...';
     healthBadge.className = 'badge gray';
@@ -125,7 +159,7 @@ async function refreshAllData() {
         const hjson = await h.json();
         healthBadge.textContent = '🟢 نشطة';
         healthBadge.className = 'badge green';
-        statStatus.textContent = ' працює';
+        statStatus.textContent = 'يعمل';
         statVersion.textContent = hjson.version || hjson.status || '—';
         statTime.textContent = new Date().toLocaleTimeString('ar-SA');
     } catch {
@@ -139,7 +173,7 @@ async function refreshAllData() {
 
 async function loadStatus() {
     keysList.innerHTML = '<p class="loading">جاري التحميل</p>';
-    sessionsList.innerHTML = '<p class="loading>جاري التحميل</p>';
+    sessionsList.innerHTML = '<p class="loading">جاري التحميل</p>';
 
     const { ok, data } = await api('GET', '/admin/status');
     if (!ok) {
@@ -148,39 +182,53 @@ async function loadStatus() {
         return;
     }
 
+    // Counts
+    const counts = data.counts || {};
+    statAvailable.textContent = counts.available ?? '—';
+    statBound.textContent = counts.bound ?? '—';
+    statTotal.textContent = data.keys ? data.keys.length : '—';
+
     // Keys
     const keys = data.keys || [];
     if (!keys.length) {
-        keysList.innerHTML = '<p class="loading">لا توجد مفاتيح</p>';
+        keysList.innerHTML = '<p class="loading">لا توجد مفاتيح، أضف من النموذج أعلاه</p>';
     } else {
-        keysList.innerHTML = keys.map(k => `
+        keysList.innerHTML = keys.map(k => {
+            const sessions = (k.sessions || []).map(s => s.session_id).join(', ');
+            return `
             <div class="key-item">
                 <div class="key-info">
                     <span class="key-id">${escHtml(k.id)}</span>
                     <span class="key-label">${escHtml(k.label || k.id)}</span>
+                    ${sessions ? `<span class="key-label" style="display:block;font-size:11px">🔗 ${sessions.map(escHtml).join(', ')}</span>` : ''}
                 </div>
-                <div>
-                    <span class="key-status status-${k.state}">${stateLabel(k.state)}</span>
-                    ${k.session_id ? `<span class="key-label" style="margin-top:4px;display:block;text-align:right;font-size:11px">🔗 ${escHtml(k.session_id)}</span>` : ''}
+                <div style="text-align:left">
+                    <span class="key-status status-${escHtml(k.status)}">${stateLabel(k.status)}</span>
+                    <div class="key-actions">
+                        <button class="btn-outline small-btn" onclick="openEdit('${escHtml(k.id)}','${escHtml(k.label || '')}')">✏️ تعديل</button>
+                        <button class="btn-danger small-btn" onclick="deleteKey('${escHtml(k.id)}')">🗑️ حذف</button>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
-    // Sessions
-    const sessions = data.sessions || [];
-    if (!sessions.length) {
-        sessionsList.innerHTML = '<p class="loading">لا توجد جلسات</p>';
+    // Sessions (from bindings)
+    const bindings = data.bindings || [];
+    if (!bindings.length) {
+        sessionsList.innerHTML = '<p class="loading">لا توجد جلسات مرتبطة حالياً</p>';
     } else {
-        sessionsList.innerHTML = sessions.map(s => `
+        sessionsList.innerHTML = bindings.map(b => {
+            const boundAt = b.bound_at ? Math.round(b.bound_at * 1000) : null;
+            return `
             <div class="session-item">
                 <div class="session-info">
-                    <span class="session-id">${escHtml(s.session_id)}</span>
-                    <span class="session-label">مُنذ ${relativeTime(s.bound_at)}</span>
+                    <span class="session-id">${escHtml(b.session_id)}</span>
+                    <span class="session-label">${boundAt ? 'مُنذ ' + relativeTime(boundAt) : ''}</span>
                 </div>
-                <span class="key-status status-${s.key_state}">${stateLabel(s.key_state)} ${s.key_id ? '('+escHtml(s.key_id)+')' : ''}</span>
-            </div>
-        `).join('');
+                <span class="key-status status-bound">${escHtml(b.key_id)}</span>
+            </div>`;
+        }).join('');
     }
 }
 
@@ -188,8 +236,104 @@ async function loadStatus() {
 async function testProxyEndpoint() {
     const { ok, data } = await api('GET', '/admin/status');
     showActionResult(ok ? 'success' : 'error',
-        ok ? `✅ Proxy يعمل! الحالة: ${JSON.stringify(data, null, 2)}` : `❌ خطأ: ${JSON.stringify(data)}`);
+        ok ? `✅ Proxy يعمل! عدد المفاتيح: ${data.keys ? data.keys.length : 0}` : `❌ خطأ: ${JSON.stringify(data)}`);
 }
+
+// ── Add Key ───────────────────────────────────────────────────────────────
+btnAddKey.addEventListener('click', async () => {
+    const keyId = newKeyId.value.trim();
+    const secret = newKeySecret.value.trim();
+    const label = newKeyLabel.value.trim();
+    if (!keyId || !secret) {
+        addResult.className = 'action-result error';
+        addResult.textContent = '❌ أدخل معرّف المفتاح والمفتاح السري';
+        addResult.classList.remove('hidden');
+        return;
+    }
+    const { ok, status, data } = await api('POST', '/admin/add-key', { key_id: keyId, secret, label });
+    showAddResult(ok, ok ? `✅ تمت إضافة ${keyId}` : (data && data.detail ? `❌ ${data.detail}` : `❌ HTTP ${status}`));
+    if (ok) {
+        newKeyId.value = '';
+        newKeySecret.value = '';
+        newKeyLabel.value = '';
+        loadStatus();
+    }
+});
+
+function showAddResult(ok, msg) {
+    addResult.className = `action-result ${ok ? 'success' : 'error'}`;
+    addResult.textContent = msg;
+    addResult.classList.remove('hidden');
+    setTimeout(() => addResult.classList.add('hidden'), 8000);
+}
+
+// ── Edit Modal ────────────────────────────────────────────────────────────
+window.openEdit = function(keyId, label) {
+    editKeyTitle.textContent = keyId;
+    editKeyId.value = keyId;
+    editKeyLabel.value = label || '';
+    editKeySecret.value = '';
+    editResult.classList.add('hidden');
+    editModal.classList.remove('hidden');
+};
+
+btnEditCancel.addEventListener('click', () => {
+    editModal.classList.add('hidden');
+});
+
+btnEditSave.addEventListener('click', async () => {
+    const keyId = editKeyId.value.trim();
+    const payload = { label: editKeyLabel.value.trim() };
+    if (editKeySecret.value.trim()) payload.secret = editKeySecret.value.trim();
+    const { ok, data } = await api('PUT', `/admin/update-key/${encodeURIComponent(keyId)}`, payload);
+    editResult.className = `action-result ${ok ? 'success' : 'error'}`;
+    editResult.textContent = ok ? '✅ تم الحفظ' : `❌ ${data && data.detail ? data.detail : 'فشل'}`;
+    editResult.classList.remove('hidden');
+    if (ok) {
+        setTimeout(() => editModal.classList.add('hidden'), 800);
+        loadStatus();
+    }
+});
+
+// ── Delete Key ────────────────────────────────────────────────────────────
+window.deleteKey = async function(keyId) {
+    if (!confirm(`هل أنت متأكد من حذف المفتاح "${keyId}"؟ ستفقد كل حوال إن كان مرتبط.`)) return;
+    const { ok, data } = await api('DELETE', `/admin/delete-key/${encodeURIComponent(keyId)}`);
+    showActionResult(ok ? 'success' : 'error', ok ? `🗑️ تم حذف ${keyId}` : `❌ ${data && data.detail ? data.detail : 'فشل'}`);
+    if (ok) loadStatus();
+};
+
+// ── Sync keys.json ────────────────────────────────────────────────────────
+btnSyncKeys.addEventListener('click', async () => {
+    const { ok, data } = await api('POST', '/admin/reload-keys');
+    showActionResult(ok ? 'success' : 'error', ok ? `✅ ${data && data.message ? data.message : 'تمت المزامنة'}` : `❌ ${JSON.stringify(data)}`);
+    if (ok) loadStatus();
+});
+
+// ── Bot Connection ────────────────────────────────────────────────────────
+btnToggle.addEventListener('click', () => {
+    tokenHidden = !tokenHidden;
+    botToken.style.filter = tokenHidden ? 'blur(4px)' : 'none';
+    btnToggle.textContent = tokenHidden ? 'إظهار' : 'إخفاء';
+});
+
+btnCopy.addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText(adminToken);
+        btnCopy.textContent = '✓ تم';
+        setTimeout(() => btnCopy.textContent = 'نسخ', 1500);
+    } catch {
+        // fallback
+        const ta = document.createElement('textarea');
+        ta.value = adminToken;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btnCopy.textContent = '✓ تم';
+        setTimeout(() => btnCopy.textContent = 'نسخ', 1500);
+    }
+});
 
 // ── API Tester ────────────────────────────────────────────────────────────
 apiMethod.addEventListener('change', () => {
@@ -199,12 +343,12 @@ apiMethod.addEventListener('change', () => {
 apiSend.addEventListener('click', async () => {
     const method = apiMethod.value;
     const path = apiUrl.value.trim();
-    const body = method === 'POST' ? apiBody.value.trim() : null;
+    const body = apiBody.value.trim();
     apiResult.classList.remove('hidden');
     apiResult.textContent = 'جاري...';
     try {
         const parsed = body ? JSON.parse(body) : null;
-        const { ok, status, data } = await api(method, path, parsed);
+        const { ok, status, data } = await api(method, path, (method === 'GET' || !body) ? null : parsed);
         apiResult.textContent = `HTTP ${status} ${ok ? '✅' : '❌'}\n\n${JSON.stringify(data, null, 2)}`;
         apiResult.style.color = ok ? 'var(--green)' : 'var(--red)';
     } catch (e) {
@@ -219,16 +363,15 @@ btnResetKey.addEventListener('click', async () => {
     const target = document.getElementById('reset-target').value;
     if (!keyId) { showActionResult('error', '❌ أدخل key-id'); return; }
     const { ok, data } = await api('POST', '/admin/reset-key', { key_id: keyId, target_state: target });
-    showActionResult(ok ? 'success' : 'error', ok ? `✅ ${JSON.stringify(data)}` : `❌ ${JSON.stringify(data)}`);
+    showActionResult(ok ? 'success' : 'error', ok ? `✅ ${JSON.stringify(data)}` : `❌ ${data && data.detail ? data.detail : JSON.stringify(data)}`);
     if (ok) loadStatus();
 });
 
-btnReassign.addEventListener('click', async () => {
-    const sessionId = document.getElementById('reassign-session').value.trim();
-    const newKeyId = document.getElementById('reassign-key').value.trim();
-    if (!sessionId || !newKeyId) { showActionResult('error', '❌ أدخل session-id و key-id'); return; }
-    const { ok, data } = await api('POST', `/admin/reassign-session/${encodeURIComponent(sessionId)}`, { key_id: newKeyId });
-    showActionResult(ok ? 'success' : 'error', ok ? `✅ ${JSON.stringify(data)}` : `❌ ${JSON.stringify(data)}`);
+btnUnbind.addEventListener('click', async () => {
+    const sessionId = document.getElementById('unbind-session').value.trim();
+    if (!sessionId) { showActionResult('error', '❌ أدخل session-id'); return; }
+    const { ok, data } = await api('POST', `/admin/unbind/${encodeURIComponent(sessionId)}`);
+    showActionResult(ok ? 'success' : 'error', ok ? `✅ تم فك ربط ${sessionId}` : `❌ ${data && data.detail ? data.detail : JSON.stringify(data)}`);
     if (ok) loadStatus();
 });
 
@@ -237,7 +380,7 @@ btnSetState.addEventListener('click', async () => {
     const state = document.getElementById('set-state').value;
     if (!keyId) { showActionResult('error', '❌ أدخل key-id'); return; }
     const { ok, data } = await api('POST', '/admin/set-key-state', { key_id: keyId, state });
-    showActionResult(ok ? 'success' : 'error', ok ? `✅ ${JSON.stringify(data)}` : `❌ ${JSON.stringify(data)}`);
+    showActionResult(ok ? 'success' : 'error', ok ? `✅ ${JSON.stringify(data)}` : `❌ ${data && data.detail ? data.detail : JSON.stringify(data)}`);
     if (ok) loadStatus();
 });
 
@@ -255,12 +398,12 @@ function stateLabel(s) {
         exhausted: 'منتهي',
         invalid: 'غير صالح'
     };
-    return map[s] || s;
+    return map[s] || s || '—';
 }
 
-function relativeTime(iso) {
-    if (!iso) return '—';
-    const diff = Date.now() - new Date(iso).getTime();
+function relativeTime(ms) {
+    if (!ms) return '—';
+    const diff = Date.now() - ms;
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'الآن';
     if (m < 60) return `منذ ${m} دقيقة`;
@@ -274,4 +417,11 @@ function showActionResult(type, msg) {
     actionResult.textContent = msg;
     actionResult.classList.remove('hidden');
     setTimeout(() => actionResult.classList.add('hidden'), 8000);
+}
+
+// Init token display blur
+if (adminToken) {
+    botToken.textContent = adminToken;
+    tokenHidden = true;
+    botToken.style.filter = 'blur(4px)';
 }

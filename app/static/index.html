@@ -55,10 +55,38 @@
                     <label>الوقت</label>
                     <span id="stat-time" class="value">—</span>
                 </div>
+                <div class="stat">
+                    <label>متاح</label>
+                    <span id="stat-available" class="value">—</span>
+                </div>
+                <div class="stat">
+                    <label>مرتبط</label>
+                    <span id="stat-bound" class="value">—</span>
+                </div>
+                <div class="stat">
+                    <label>إجمالي</label>
+                    <span id="stat-total" class="value">—</span>
+                </div>
             </div>
             <div class="action-row">
                 <button id="refresh-all" class="btn">🔄 تحديث الكل</button>
                 <button id="test-proxy" class="btn-outline">🧪 اختبار Proxy</button>
+            </div>
+        </section>
+
+        <!-- Add / Manage Keys -->
+        <section class="card">
+            <h2>➕ إضافة مفتاح جديد</h2>
+            <div class="action-row">
+                <input type="text" id="new-key-id" placeholder="معرّف المفتاح (مثل: key-delta)">
+                <input type="text" id="new-key-label" placeholder="الاسم الظاهر (مثل: مفتاح رئيسي)">
+                <input type="password" id="new-key-secret" placeholder="مفتاح DeepSeek الحقيقي (sk-...)">
+                <button id="btn-add-key" class="btn">إضافة</button>
+            </div>
+            <p id="add-result" class="action-result hidden"></p>
+            <div class="action-row" style="margin-top:8px">
+                <button id="reload-keys" class="btn">♻️ إعادة تحميل المفاتيح</button>
+                <button id="btn-sync-keys-json" class="btn-outline">🔄 إعادة مزامنة keys.json</button>
             </div>
         </section>
 
@@ -68,16 +96,37 @@
             <div id="keys-list" class="keys-list">
                 <p class="loading">جاري التحميل...</p>
             </div>
-            <div class="action-row">
-                <button id="reload-keys" class="btn">♻️ إعادة تحميل المفاتيح</button>
-            </div>
         </section>
 
         <!-- Sessions -->
         <section class="card">
-            <h2>👥 الجلسات النشطة</h2>
+            <h2>👥 الجلسات المرتبطة</h2>
             <div id="sessions-list" class="sessions-list">
                 <p class="loading">جاري التحميل...</p>
+            </div>
+        </section>
+
+        <!-- Bot Connection -->
+        <section class="card">
+            <h2>🤖 اتصال الـ Bot</h2>
+            <p class="hint">هذه هي أسهل طريقة لأي روبوت أو سكربت أو تطبيق خارجي يتصل بالخدمة (بالـ X-Admin-Token).</p>
+            <div class="bot-connect">
+                <div class="bot-connect-item">
+                    <label>رابط الخادم (BASE)</label>
+                    <code id="bot-base">—</code>
+                </div>
+                <div class="bot-connect-item">
+                    <label>Admin Token</label>
+                    <div class="token-row">
+                        <code id="bot-token">—</code>
+                        <button id="btn-toggle-token" class="btn-outline small-btn">إظهار</button>
+                        <button id="btn-copy-token" class="btn-outline small-btn">نسخ</button>
+                    </div>
+                </div>
+                <div class="bot-connect-item">
+                    <label>مثال curl</label>
+                    <pre id="curl-example" class="code-block"></pre>
+                </div>
             </div>
         </section>
 
@@ -89,6 +138,8 @@
                     <select id="api-method">
                         <option value="GET">GET</option>
                         <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
                     </select>
                     <input type="text" id="api-url" placeholder="/admin/status">
                 </div>
@@ -105,7 +156,7 @@
                 <div class="action-group">
                     <h3>Reset Key</h3>
                     <div class="action-row">
-                        <input type="text" id="reset-key-id" placeholder="key-id (مثل: key-alpha)">
+                        <input type="text" id="reset-key-id" placeholder="key-id">
                         <select id="reset-target">
                             <option value="available">متاح (available)</option>
                             <option value="cooldown">انتظار (cooldown)</option>
@@ -116,11 +167,10 @@
                     </div>
                 </div>
                 <div class="action-group">
-                    <h3>Reassign Session</h3>
+                    <h3>Unbind Session (فك ربط)</h3>
                     <div class="action-row">
-                        <input type="text" id="reassign-session" placeholder="session-id">
-                        <input type="text" id="reassign-key" placeholder="key-id جديد">
-                        <button id="btn-reassign" class="btn-danger">Reassign</button>
+                        <input type="text" id="unbind-session" placeholder="session-id">
+                        <button id="btn-unbind" class="btn-danger">فك الربط</button>
                     </div>
                 </div>
                 <div class="action-group">
@@ -140,6 +190,24 @@
             <div id="action-result" class="action-result hidden"></div>
         </section>
     </main>
+</div>
+
+<!-- ======= EDIT KEY MODAL ======= -->
+<div id="edit-modal" class="modal hidden">
+    <div class="modal-box">
+        <h3>✏️ تعديل المفتاح <span id="edit-key-title"></span></h3>
+        <label>المعرّف (غير قابل للتغيير)</label>
+        <input type="text" id="edit-key-id" disabled>
+        <label>الاسم الظاهر (label)</label>
+        <input type="text" id="edit-key-label" placeholder="الاسم الظاهر">
+        <label>المفتاح السري (secret) — اتركه فارغاً لعدم تغييره</label>
+        <input type="password" id="edit-key-secret" placeholder="sk-... (اختياري)">
+        <div class="action-row">
+            <button id="btn-edit-save" class="btn">حفظ</button>
+            <button id="btn-edit-cancel" class="btn-outline">إلغاء</button>
+        </div>
+        <p id="edit-result" class="action-result hidden"></p>
+    </div>
 </div>
 
 <script src="/static/app.js"></script>

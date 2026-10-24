@@ -189,6 +189,67 @@ class Store:
             conn.commit()
         return cur.rowcount > 0
 
+    def add_key(
+        self,
+        key_id: str,
+        secret: str,
+        label: str = "",
+        now: Optional[float] = None,
+    ) -> bool:
+        """Insert a new key into the pool. Returns True if inserted (False if id exists)."""
+        ts = self._now() if now is None else now
+        with self._lock:
+            conn = self._conn()
+            try:
+                cur = conn.execute(
+                    "INSERT INTO keys (id, secret, label, status, cooldown_until, updated_at) "
+                    "VALUES (?, ?, ?, ?, NULL, ?)",
+                    (key_id, secret, label, K_AVAILABLE, ts),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+            except sqlite3.IntegrityError:
+                conn.rollback()
+                return False
+
+    def update_key(
+        self,
+        key_id: str,
+        secret: Optional[str] = None,
+        label: Optional[str] = None,
+        now: Optional[float] = None,
+    ) -> bool:
+        """Update a key's secret and/or label. Returns True if the key existed."""
+        ts = self._now() if now is None else now
+        updates, params = [], []
+        if secret is not None:
+            updates.append("secret = ?")
+            params.append(secret)
+        if label is not None:
+            updates.append("label = ?")
+            params.append(label)
+        if not updates:
+            return False
+        updates.append("updated_at = ?")
+        params.append(ts)
+        params.append(key_id)
+        with self._lock:
+            conn = self._conn()
+            cur = conn.execute(
+                f"UPDATE keys SET {', '.join(updates)} WHERE id = ?",
+                params,
+            )
+            conn.commit()
+        return cur.rowcount > 0
+
+    def delete_key(self, key_id: str) -> bool:
+        """Delete a key and its bindings (cascade). Returns True if deleted."""
+        with self._lock:
+            conn = self._conn()
+            cur = conn.execute("DELETE FROM keys WHERE id = ?", (key_id,))
+            conn.commit()
+        return cur.rowcount > 0
+
     @staticmethod
     def _row_to_key(row: Tuple) -> Dict[str, Any]:
         key_id, secret, label, status, cooldown_until, updated_at = row

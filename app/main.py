@@ -12,8 +12,11 @@ from fastapi.staticfiles import StaticFiles
 
 from app import config
 from app.proxy import NoKeyAvailable, NoSessionHeader, ProxyResponse, SessionProxy
-from app.store import Binding, K_AVAILABLE, K_BOUND, K_COOLDOWN, K_EXHAUSTED, K_INVALID, Store
+from app.store import (K_AVAILABLE, K_BOUND, K_COOLDOWN, K_EXHAUSTED, K_INVALID,
+                       Binding, Store)
 from app.util import mask_key
+
+_ALL_KEY_STATES = (K_AVAILABLE, K_BOUND, K_COOLDOWN, K_EXHAUSTED, K_INVALID)
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +265,203 @@ def create_app(
         """Unbind a session so its next request picks a fresh key from the pool."""
         ok = _store.unbind(session_id)
         return JSONResponse({"session_id": session_id, "reassigned": ok})
+
+    # JSON-body variants used by the dashboard (kept separate from the
+    # path-param variants above for backward compatibility with the CLI).
+
+    @app.post("/admin/set-key-state")
+    async def set_key_state_json(
+        payload: dict,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Set a key's state from the dashboard.
+
+        Expected payload: {"key_id": str, "state": str}.
+        state: available | bound | cooldown | exhausted | invalid
+        """
+        key_id = str(payload.get("key_id", "")).strip()
+        state = str(payload.get("state", "")).strip()
+        if not key_id or state not in _ALL_KEY_STATES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="key_id (and a valid state) are required",
+            )
+        ok = _store.set_key_state(key_id, state)
+        if not ok:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="key not found",
+            )
+        return JSONResponse({"key_id": key_id, "state": state, "set": True})
+
+    @app.post("/admin/reset-key")
+    async def reset_key_json(
+        payload: dict,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Reset a key to available from the dashboard.
+
+        Expected payload: {"key_id": str}. The optional target_state is honored
+        if present, otherwise the key is set to available.
+        """
+        key_id = str(payload.get("key_id", "")).strip()
+        if not key_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="key_id is required",
+            )
+        keys_by_id = {k["id"]: k for k in _store.list_keys()}
+        existing = keys_by_id.get(key_id)
+        if existing is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="key not found",
+            )
+        target = str(payload.get("target_state", "available")).strip()
+        if target not in _ALL_KEY_STATES:
+            target = K_AVAILABLE
+        if existing["status"] == target:
+            return JSONResponse({"key_id": key_id, "status": "unchanged"})
+        ok = _store.set_key_state(key_id, target)
+        return JSONResponse({"key_id": key_id, "status": target if ok else "unchanged"})
+
+    # ------------------------------------------------------------------
+    # Admin: key management (add / update / rename / delete) + unbind
+    # ------------------------------------------------------------------
+
+    @app.post(config.ADD_KEY_PATH)
+    async def add_key(
+        payload: dict,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Add a new key to the pool.
+
+        Expected payload: {"key_id": str, "secret": str, "label": str (optional)}
+        """
+        key_id = str(payload.get("key_id", "")).strip()
+        secret = str(payload.get("secret", "")).strip()
+        if not key_id or not secret:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="key_id and secret are required",
+            )
+        inserted = _store.add_key(key_id=key_id, secret=secret, label=str(payload.get("label", "")))
+        if not inserted:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="key id already exists",
+            )
+        return JSONResponse({"key_id": key_id, "added": True})
+
+    @app.put(config.UPDATE_KEY_PATH)
+    async def update_key(
+        key_id: str,
+        payload: dict,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Update a key's secret and/or label.
+
+        Expected payload: {"secret": str (optional), "label": str (optional)}.
+        Omitted fields are left unchanged.
+        """
+        secret = payload.get("secret")
+        label = payload.get("label")
+        if secret is not None:
+            secret = str(secret).strip()
+            if not secret:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="secret cannot be empty",
+                )
+        if label is not None:
+            label = str(label).strip()
+        updated = _store.update_key(
+            key_id=key_id,
+            secret=str(secret) if secret is not None else None,
+            label=str(label) if label is not None else None,
+        )
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="key not found",
+            )
+        return JSONResponse({"key_id": key_id, "updated": True})
+
+    @app.post(config.RENAME_KEY_PATH)
+    async def rename_key(
+        key_id: str,
+        payload: dict,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Rename a key's label only.
+
+        Expected payload: {"label": str}. Convenience wrapper around update.
+        """
+        label = str(payload.get("label", "")).strip()
+        updated = _store.update_key(key_id=key_id, label=label)
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="key not found",
+            )
+        return JSONResponse({"key_id": key_id, "label": label, "renamed": True})
+
+    @app.delete(config.DELETE_KEY_PATH)
+    async def delete_key(
+        key_id: str,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Delete a key from the pool (also removes its bindings)."""
+        deleted = _store.delete_key(key_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="key not found",
+            )
+        return JSONResponse({"key_id": key_id, "deleted": True})
+
+    @app.post(config.UNBIND_SESSION_PATH)
+    async def unbind_session(
+        session_id: str,
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Force-unbind a session so its next request picks a fresh key."""
+        ok = _store.unbind(session_id)
+        return JSONResponse({"session_id": session_id, "unbound": ok})
+
+    @app.post("/admin/reload-keys")
+    async def reload_keys(
+        _token: str = Depends(_require_admin),
+    ) -> JSONResponse:
+        """Re-read keys.json and add any keys that are not already in the pool.
+
+        Existing keys are left untouched (no secret overwrites). Useful after a
+        redeploy when keys.json changed.
+        """
+        added: List[str] = []
+        import json as _json
+        try:
+            raw = config.KEYS_FILE.read_text(encoding="utf-8")
+            entries = _json.loads(raw).get("keys", [])
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"failed to read keys file: {exc}",
+            )
+        existing = {k["id"] for k in _store.list_keys()}
+        for entry in entries:
+            key_id = str(entry.get("id", "")).strip()
+            secret = str(entry.get("key", "")).strip()
+            if not key_id or not secret or key_id in existing:
+                continue
+            insert_ok = _store.add_key(
+                key_id=key_id,
+                secret=secret,
+                label=str(entry.get("label", "")),
+            )
+            if insert_ok:
+                added.append(key_id)
+        return JSONResponse({"added": added, "total": len(existing) + len(added)})
 
     return app
 

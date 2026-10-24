@@ -37,6 +37,11 @@ RETRY_MAX_DELAY = float(os.environ.get("RETRY_MAX_DELAY", "8.0"))
 # Admin listeners.
 STATUS_PATH = os.environ.get("STATUS_PATH", "/admin/status")
 RESET_KEY_PATH = os.environ.get("RESET_KEY_PATH", "/admin/reset-key/{key_id}")
+ADD_KEY_PATH = os.environ.get("ADD_KEY_PATH", "/admin/add-key")
+UPDATE_KEY_PATH = os.environ.get("UPDATE_KEY_PATH", "/admin/update-key/{key_id}")
+DELETE_KEY_PATH = os.environ.get("DELETE_KEY_PATH", "/admin/delete-key/{key_id}")
+UNBIND_SESSION_PATH = os.environ.get("UNBIND_SESSION_PATH", "/admin/unbind/{session_id}")
+RENAME_KEY_PATH = os.environ.get("RENAME_KEY_PATH", "/admin/rename-key/{key_id}")
 REASSIGN_PATH = os.environ.get("REASSIGN_PATH", "/admin/reassign-session/{session_id}")
 
 # Session id header names, in priority order.
