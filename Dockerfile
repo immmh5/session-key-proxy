@@ -19,11 +19,11 @@ COPY keys.json ./keys.json
 # Every proxy instance binds ONE DeepSeek key per session id. The key pool is
 # seeded from KEYS_FILE only on a fresh (empty) DB, so write the real keys
 # into keys.json BEFORE first boot.
-ENV DB_PATH=/var/data/proxy.db
+ENV DB_PATH=/app/data/proxy.db
 ENV KEYS_FILE=/app/keys.json
 
-# Persistent data directory for the SQLite store (disk-mounted on Render).
-RUN mkdir -p /var/data && chown -R app:app /var/data
+# App data directory (no persistent disk on free tier; container-writable).
+RUN mkdir -p /app/data && chown -R app:app /app/data
 
 # The app binds to this port; Render keeps $PORT in sync (default 8000).
 EXPOSE 8000

@@ -138,6 +138,11 @@ def create_app(
         """Health check for the root endpoint."""
         return {"service": "session-key-proxy", "version": "1.0.0"}
 
+    @app.get("/healthz")
+    async def healthz() -> Dict[str, str]:
+        """Health check for Render healthcheck."""
+        return {"status": "ok"}
+
     @app.get(PROXY_PATH)
     async def proxy_health() -> Dict[str, str]:
         """Health check for the proxy endpoint (supports GET for load-balancer probes)."""
