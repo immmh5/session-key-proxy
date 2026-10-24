@@ -22,7 +22,7 @@ services:
       - key: KEYS_FILE
         value: /app/keys.json
       - key: DB_PATH
-        value: /var/data/proxy.db
+        value: /app/data/proxy.db
       - key: SESSION_TTL_SECONDS
         value: "2592000"
       - key: COOLDOWN_SECONDS
@@ -35,7 +35,3 @@ services:
         value: "8.0"
       - key: PORT
         value: "8000"
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
