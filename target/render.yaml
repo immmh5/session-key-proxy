@@ -1,0 +1,41 @@
+# Render Blueprint for the Session-Bound API Key Proxy.
+# Builds the Dockerfile below and runs it as a public web service.
+# SQLite needs no managed database: the DB lives on a persistent disk
+# mounted at /var/data (see the `disk:` block) and seeded from KEYS/keys.json
+# only on a fresh (empty) DB.
+services:
+  - type: web
+    name: session-key-proxy
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    branch: main
+    envVars:
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: UPSTREAM_URL
+        value: https://api.deepseek.com/v1/chat/completions
+      - key: KEYS_FILE
+        value: /app/keys.json
+      - key: DB_PATH
+        value: /var/data/proxy.db
+      - key: SESSION_TTL_SECONDS
+        value: "2592000"
+      - key: COOLDOWN_SECONDS
+        value: "30"
+      - key: MAX_TRANSIENT_RETRIES
+        value: "3"
+      - key: RETRY_BASE_DELAY
+        value: "0.5"
+      - key: RETRY_MAX_DELAY
+        value: "8.0"
+      - key: PORT
+        value: "8000"
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
