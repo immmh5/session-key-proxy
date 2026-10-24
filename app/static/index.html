@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Key Proxy — لوحة التحكم</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<!-- ======= LOGIN SCREEN ======= -->
+<div id="login-screen" class="screen">
+    <div class="login-box">
+        <div class="logo">🔐</div>
+        <h1>لوحة تحكم Session Key Proxy</h1>
+        <p class="subtitle">أدخل Admin Token للوصول</p>
+        <form id="login-form">
+            <input type="password" id="admin-token" placeholder="X-Admin-Token" autocomplete="off" required>
+            <button type="submit">دخول</button>
+        </form>
+        <p id="login-error" class="error hidden"></p>
+    </div>
+</div>
+
+<!-- ======= DASHBOARD SCREEN ======= -->
+<div id="dashboard-screen" class="screen hidden">
+    <!-- Header -->
+    <header>
+        <div class="header-right">
+            <span class="logo">🔑</span>
+            <div>
+                <h1>Session Key Proxy</h1>
+                <small id="service-url"></small>
+            </div>
+        </div>
+        <div class="header-left">
+            <span id="health-badge" class="badge">جاري التحميل...</span>
+            <button id="logout-btn" class="btn-outline">خروج</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Service Health -->
+        <section class="card">
+            <h2>🟢 حالة الخدمة</h2>
+            <div class="grid-3">
+                <div class="stat">
+                    <label>الحالة</label>
+                    <span id="stat-status" class="value">—</span>
+                </div>
+                <div class="stat">
+                    <label>إصدار</label>
+                    <span id="stat-version" class="value">—</span>
+                </div>
+                <div class="stat">
+                    <label>الوقت</label>
+                    <span id="stat-time" class="value">—</span>
+                </div>
+            </div>
+            <div class="action-row">
+                <button id="refresh-all" class="btn">🔄 تحديث الكل</button>
+                <button id="test-proxy" class="btn-outline">🧪 اختبار Proxy</button>
+            </div>
+        </section>
+
+        <!-- Key Pool -->
+        <section class="card">
+            <h2>🔑 مجموعة المفاتيح</h2>
+            <div id="keys-list" class="keys-list">
+                <p class="loading">جاري التحميل...</p>
+            </div>
+            <div class="action-row">
+                <button id="reload-keys" class="btn">♻️ إعادة تحميل المفاتيح</button>
+            </div>
+        </section>
+
+        <!-- Sessions -->
+        <section class="card">
+            <h2>👥 الجلسات النشطة</h2>
+            <div id="sessions-list" class="sessions-list">
+                <p class="loading">جاري التحميل...</p>
+            </div>
+        </section>
+
+        <!-- API Tester -->
+        <section class="card">
+            <h2>🌐 اختبار API</h2>
+            <div class="api-tester">
+                <div class="method-url">
+                    <select id="api-method">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                    </select>
+                    <input type="text" id="api-url" placeholder="/admin/status">
+                </div>
+                <textarea id="api-body" class="hidden" placeholder="Request Body (JSON)" rows="3"></textarea>
+                <button id="api-send" class="btn">إرسال</button>
+                <pre id="api-result" class="code-block hidden"></pre>
+            </div>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="card">
+            <h2>⚡ إجراءات سريعة</h2>
+            <div class="quick-actions">
+                <div class="action-group">
+                    <h3>Reset Key</h3>
+                    <div class="action-row">
+                        <input type="text" id="reset-key-id" placeholder="key-id (مثل: key-alpha)">
+                        <select id="reset-target">
+                            <option value="available">متاح (available)</option>
+                            <option value="cooldown">انتظار (cooldown)</option>
+                            <option value="exhausted">منتهي (exhausted)</option>
+                            <option value="invalid">غير صالح (invalid)</option>
+                        </select>
+                        <button id="btn-reset-key" class="btn-danger">Reset</button>
+                    </div>
+                </div>
+                <div class="action-group">
+                    <h3>Reassign Session</h3>
+                    <div class="action-row">
+                        <input type="text" id="reassign-session" placeholder="session-id">
+                        <input type="text" id="reassign-key" placeholder="key-id جديد">
+                        <button id="btn-reassign" class="btn-danger">Reassign</button>
+                    </div>
+                </div>
+                <div class="action-group">
+                    <h3>Set Key State</h3>
+                    <div class="action-row">
+                        <input type="text" id="set-key-id" placeholder="key-id">
+                        <select id="set-state">
+                            <option value="available">متاح</option>
+                            <option value="cooldown">انتظار</option>
+                            <option value="exhausted">منتهي</option>
+                            <option value="invalid">غير صالح</option>
+                        </select>
+                        <button id="btn-set-state" class="btn-warning">Set State</button>
+                    </div>
+                </div>
+            </div>
+            <div id="action-result" class="action-result hidden"></div>
+        </section>
+    </main>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

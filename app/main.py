@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager, suppress
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import config
 from app.proxy import NoKeyAvailable, NoSessionHeader, ProxyResponse, SessionProxy
@@ -126,6 +127,14 @@ def create_app(
         version="1.0.0",
         lifespan=lifespan,
     )
+
+    # Serve static dashboard
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+    @app.get("/")
+    async def root() -> FileResponse:
+        """Serve the admin dashboard."""
+        return FileResponse("app/static/index.html")
 
     PROXY_PATH = config.PROXY_ENDPOINT
 
