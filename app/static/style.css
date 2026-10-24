@@ -504,6 +504,22 @@ main {
 /* ===== HINT ===== */
 .hint { color: var(--text-muted); font-size: 12px; margin-bottom: 12px; }
 
+/* ===== SETTINGS GRID ===== */
+.settings-grid { display: flex; flex-direction: column; gap: 12px; }
+.settings-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.settings-row input[type="text"],
+.settings-row input[type="password"] {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+}
+.settings-row input:focus { outline: none; border-color: var(--accent); }
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }

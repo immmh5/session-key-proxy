@@ -62,6 +62,16 @@ const btnUnbind    = document.getElementById('btn-unbind');
 const btnSetState  = document.getElementById('btn-set-state');
 const btnSyncKeys  = document.getElementById('btn-sync-keys-json');
 
+// DeepSeek API Settings
+const btnSaveApiKey = document.getElementById('btn-save-api-key');
+const btnPreviewKeys = document.getElementById('btn-preview-keys');
+const apiSaveResult = document.getElementById('api-save-result');
+const apiEmail     = document.getElementById('api-email');
+const apiPassword  = document.getElementById('api-password');
+const apiKeyIdInput = document.getElementById('api-key-id');
+const apiKeySecretInput = document.getElementById('api-key-secret');
+const apiKeyLabelInput = document.getElementById('api-key-label');
+
 // ── Init ──────────────────────────────────────────────────────────────────
 if (adminToken) {
     validateToken().then(ok => {
@@ -382,6 +392,61 @@ btnSetState.addEventListener('click', async () => {
     const { ok, data } = await api('POST', '/admin/set-key-state', { key_id: keyId, state });
     showActionResult(ok ? 'success' : 'error', ok ? `✅ ${JSON.stringify(data)}` : `❌ ${data && data.detail ? data.detail : JSON.stringify(data)}`);
     if (ok) loadStatus();
+});
+
+// ── DeepSeek API Settings ─────────────────────────────────────────────────
+btnSaveApiKey.addEventListener('click', async () => {
+    const keyId = apiKeyIdInput.value.trim();
+    const secret = apiKeySecretInput.value.trim();
+    const label = apiKeyLabelInput.value.trim();
+    if (!keyId || !secret) {
+        apiSaveResult.className = 'action-result error';
+        apiSaveResult.textContent = '❌ أدخل معرّف المفتاح والمفتاح السري (sk-...)';
+        apiSaveResult.classList.remove('hidden');
+        return;
+    }
+    // If email and password provided, append them to label for reference
+    const emailVal = apiEmail.value.trim();
+    const passVal = apiPassword.value.trim();
+    let finalLabel = label;
+    if (emailVal) finalLabel = finalLabel ? `${finalLabel} | 📧 ${emailVal}` : `📧 ${emailVal}`;
+    if (passVal) finalLabel = finalLabel ? `${finalLabel} | 🔐` : `🔐`;
+    const { ok, status: st, data } = await api('POST', '/admin/add-key', {
+        key_id: keyId,
+        secret: secret,
+        label: finalLabel || keyId,
+    });
+    apiSaveResult.className = `action-result ${ok ? 'success' : 'error'}`;
+    if (ok) {
+        apiSaveResult.textContent = `✅ تم حفظ مفتاح "${keyId}" في الخدمة مؤقتاً! (للحفظ الدائم حدّث keys.json)`;
+        apiEmail.value = '';
+        apiPassword.value = '';
+        apiKeyIdInput.value = '';
+        apiKeySecretInput.value = '';
+        apiKeyLabelInput.value = '';
+        loadStatus();
+    } else {
+        apiSaveResult.textContent = `❌ ${data && data.detail ? data.detail : `HTTP ${st}`}`;
+    }
+    apiSaveResult.classList.remove('hidden');
+    setTimeout(() => apiSaveResult.classList.add('hidden'), 10000);
+});
+
+btnPreviewKeys.addEventListener('click', async () => {
+    const { ok, data } = await api('GET', '/admin/status');
+    if (!ok) {
+        alert('❌ فشل تحميل المفاتيح');
+        return;
+    }
+    const keys = data.keys || [];
+    if (!keys.length) {
+        alert('لا توجد مفاتيح حالياً');
+        return;
+    }
+    const lines = keys.map(k =>
+        `🔑 ${k.id}\n   Label: ${k.label || '—'}\n   Status: ${stateLabel(k.status)}\n   Secret: ${k.masked}`
+    ).join('\n\n');
+    alert(`📋 المفاتيح الحالية (مُقنّعة):\n\n${lines}\n\n⚠️ للماحظة: secrets الحقيقية لا تظهر — راجع keys.json للحصول عليها.`);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────
