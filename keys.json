@@ -1,8 +1,8 @@
 {
-  "comment": "Production DeepSeek API keys - replace placeholders with your real keys. The proxy reads this file to seed the key pool on fresh DB start.",
+  "comment": "3 DeepSeek API accounts from user's Render dashboard. These will seed the SQLite key pool on fresh DB start. To change: edit + push to GitHub.",
   "keys": [
-    { "id": "gold-primary", "key": "sk-DEMO-GOLD-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "label": "🐤 Gold Key (primary)" },
-    { "id": "acc2-fallback", "key": "sk-DEMO-ACC2-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", "label": "Account 2 (fallback)" },
-    { "id": "acc3-spare", "key": "sk-DEMO-ACC3-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "label": "Account 3 (spare)" }
+    { "id": "rnd_vpkEv2zpvGaW2fuubdO3lS1E93IL", "key": "sk-DEMO-PLACEHOLDER-REPLACE-WITH-REAL-KEY-001", "label": "🐤 Account 1 (primary)" },
+    { "id": "rnd_ckghK8iF4zOBTPrw9AutBJxv9n8D", "key": "sk-DEMO-PLACEHOLDER-REPLACE-WITH-REAL-KEY-002", "label": "Account 2 (fallback)" },
+    { "id": "rnd_Do0qX5w3PZefenGj85qAO0RMjKq8", "key": "sk-DEMO-PLACEHOLDER-REPLACE-WITH-REAL-KEY-003", "label": "Account 3 (spare)" }
   ]
 }
